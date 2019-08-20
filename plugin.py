@@ -197,7 +197,18 @@ class BasePlugin:
            if self.devtimes[didx]==devtime: # filter duplicated messages
             return False
 #         Domoticz.Debug(devtime)
-         signal = 12 # TODO: CURRENTLY NOT IMPLEMENTED!
+         signal = 12
+         if "rssi" in message:
+          try:
+           rssi = float(message["rssi"])
+          except:
+           rssi = 0
+          if rssi>-0.134:
+           signal = 10
+          elif rssi<=-7:
+           signal = 0
+          else:
+           signal = 10 - (rssi * -1.34)
          try:
           Domoticz.Debug(str(message["rssi"])+" "+str(message["snr"])+" "+str(message["noise"]))
          except:
