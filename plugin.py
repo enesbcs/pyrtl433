@@ -89,6 +89,7 @@ class BasePlugin:
         Domoticz.Debug("onStop called")
 
     def onCommand(self, Unit, Command, Level, Color):  # react to commands arrived from Domoticz
+        global Devices
         if self.mqttClient is None:
          return False
         Domoticz.Debug("Command: " + Command + " (" + str(Level) + ") Color:" + Color)
@@ -149,6 +150,13 @@ class BasePlugin:
         except:
          Domoticz.Debug("MQTT message is not a valid string!") #if message is not a real string, drop it
          return False
+        try:
+         if "'" in message:
+          message = message.replace("'",'"') # replace invalid single quotes to double quotes
+         jmsg = json.loads(message)
+         message = jmsg # reconstruct json struct
+        except:
+         pass
         mqttpath = topic.split('/')
         if "/events" in topic:
          Domoticz.Debug("MQTT message: " + topic + " " + str(message2))
@@ -170,24 +178,30 @@ class BasePlugin:
          model = ""
          ch = ""
          st = ""
-         if 'model' in message: # model name in events
-          model = str(message['model']).replace("-","_")
-         if 'channel' in message:
-          ch = str(message['channel'])
-         if 'subtype' in message:
-          st = str(message['subtype'])
-         if st=="":
-          if 'unit' in message:
-           st = str(message['unit'])
-         if ch=="" and st=="":
-          if 'id' in message:
-           st = str(message['id']) # use id only for last resort, as cheap weather stations generates new id on every restart
+         try:
+          if 'model' in message: # model name in events
+           model = str(message['model']).replace("-","_")
+          if 'channel' in message:
+           ch = str(message['channel'])
+          if 'subtype' in message:
+           st = str(message['subtype'])
+          if st=="":
+           if 'unit' in message:
+            st = str(message['unit'])
+          if ch=="" and st=="":
+           if 'id' in message:
+            st = str(message['id']) # use id only for last resort, as cheap weather stations generates new id on every restart
+         except:
+          pass
          devname = self.createdevname(model,st,ch,data,"")
-         Domoticz.Debug(devname)
-         if 'time' in message:
+         Domoticz.Debug("dname "+devname)
+         try:
+          if 'time' in message:
            devtime = str(message['time'])
-         else:
+          else:
            devtime = str(time.time())
+         except:
+          devtime = str(time.time())
          if devname not in self.devnames:
           self.devnames.append(devname)
           self.devtimes.append(devtime)
@@ -266,21 +280,21 @@ class BasePlugin:
              humi = float(message['humidity'])
             except:
              humi = None
-         if humi<0 or humi>100:
-          humi = None
+           if humi<0 or humi>100:
+            humi = None
 
          pressure = None
          if "pressure_hPa" in message:
             pressure = message['pressure']
 
          if (tempc is not None) and (humi is not None) and (pressure is not None):
-               self.SendTempHumBaroSensor(devname,tempc,humi,pressure,battery,signal)
+               self.SendTempHumBaroSensor(devname+"temphumbaro",tempc,humi,pressure,battery,signal)
          elif (tempc is not None) and (humi is not None):
-               self.SendTempHumSensor(devname,tempc,humi,battery,signal)
+               self.SendTempHumSensor(devname+"-temphum",tempc,humi,battery,signal)
          elif (tempc is not None):
-               self.SendTempSensor(devname,tempc,battery,signal)
+               self.SendTempSensor(devname+"-temp",tempc,battery,signal)
          elif (humi is not None):
-               self.SendHumSensor(devname,humi,battery,signal)
+               self.SendHumSensor(devname+"-hum",humi,battery,signal)
 
          rain = None
          if "rain" in message:
@@ -294,7 +308,7 @@ class BasePlugin:
             raintotal = message['rain_total']
 
          if rain is not None:
-               self.SendRainSensor(devname,rain,raintotal,battery,signal)
+               self.SendRainSensor(devname+"-rain",rain,raintotal,battery,signal)
 
          depth = None
          if "depth_cm" in message:
@@ -303,56 +317,67 @@ class BasePlugin:
             depth = message['depth']
 
          if depth is not None:
-               self.SendDistanceSensor(devname,depth,battery,signal)
- 
-         windstr = None
-         if "windstrength" in message:
+               self.SendDistanceSensor(devname+"-depth",depth,battery,signal)
+
+         try:
+          windstr = None
+          if "windstrength" in message:
             windstr = message['windstrength']
-         elif "wind_speed" in message:
+          elif "wind_speed" in message:
             windstr = message['wind_speed']
-         elif "average" in message:
+          elif "average" in message:
             windstr = message['average']
-         elif "wind_avg_km_h" in message:
-            windstr = message['wind_avg_km_h']
-         elif "wind_avg_m_s" in message:
+          elif "wind_avg_km_h" in message:
+            windstr = float(message['wind_avg_km_h']) * 0.277777778
+          elif "wind_avg_m_s" in message:
             windstr = message['wind_avg_m_s']
 
-         winddir = None
-         if "winddirection" in message:
-            winddir = message['winddirection']
-         elif "wind_direction" in message:
-            winddir = message['wind_direction']
-         elif "direction" in message:
-            winddir = message['direction']
+          winddir = None
+          if "winddirection" in message:
+            winddir = str(message['winddirection'])
+          elif "wind_direction" in message:
+            winddir = str(message['wind_direction'])
+          elif "direction" in message:
+            winddir = str(message['direction'])
 
-         winddirdeg = 0
-         if "wind_dir_deg" in message:
-            winddirdeg = message['wind_dir_deg']
+          winddirdeg = 0
+          if "wind_dir_deg" in message:
+            winddirdeg = str(message['wind_dir_deg'])
+            if winddir is None or winddir == "":
+             winddir = self.getdirection(winddirdeg)
 
-         windgust = None
-         if "wind_gust" in message:
+          windgust = None
+          if "wind_gust" in message:
             windgust = message['wind_gust']
-         elif "gust" in message:
+          elif "gust" in message:
             windgust = message['gust']
+          else:
+            windgust = "0"
+         except Exception as e:
+          pass
 
-         if winddir is not None:
-               self.SendWind(devname,winddirdeg,winddir,windstr,windgust,tempc,battery,signal)
+         if windstr is not None:
+             try:
+               self.SendWind(devname+"-wind",winddirdeg,winddir,windstr,windgust,tempc,battery,signal)
+             except Exception as e:
+              Domoticz.Debug(str(e))
 
          moisture = None
          if "moisture" in message:
             moisture = message['moisture']
 
          if (moisture is not None):
-               self.SendMoisture(devname,moisture,battery,signal)
+               self.SendMoisture(devname+"-moist",moisture,battery,signal)
 
          power = None
          if "power_W" in message:
             power = message['power_W']
 
          if (power is not None):
-               self.SendWattMeter(devname,watt,battery,signal)
+               self.SendWattMeter(devname+"-power",watt,battery,signal)
 
     def getdevID(self,unitname):
+          global Devices
           iUnit = -1
           for Device in Devices:
            try:
@@ -364,6 +389,7 @@ class BasePlugin:
           return iUnit
 
     def SendSwitch(self,unitname,state,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -394,6 +420,7 @@ class BasePlugin:
             return False
 
     def SendTempHumBaroSensor(self,unitname,temp,hum,press,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -418,6 +445,7 @@ class BasePlugin:
             Domoticz.Debug(str(e))
 
     def SendTempHumSensor(self,unitname,temp,hum,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -442,6 +470,7 @@ class BasePlugin:
             Domoticz.Debug(str(e))
 
     def SendTempSensor(self,unitname,temp,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -452,7 +481,7 @@ class BasePlugin:
                break
              if iUnit==0:
               iUnit=len(Devices)+1
-             Domoticz.Device(Name=unitname, Unit=iUnit,TypeName="Temp",Used=0,DeviceID=unitname).Create() # Temp
+             Domoticz.Device(Name=unitname, Unit=iUnit,TypeName="Temperature",Used=0,DeviceID=unitname).Create() # Temp
             except Exception as e:
              Domoticz.Debug(str(e))
              return False
@@ -466,6 +495,7 @@ class BasePlugin:
             Domoticz.Debug(str(e))
 
     def SendHumSensor(self,unitname,hum,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -490,6 +520,7 @@ class BasePlugin:
             Domoticz.Debug(str(e))
 
     def SendRainSensor(self,unitname,rain,raintotal,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -524,6 +555,7 @@ class BasePlugin:
             Domoticz.Debug(str(e))
 
     def SendDistanceSensor(self,unitname,dist,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -548,6 +580,7 @@ class BasePlugin:
             Domoticz.Debug(str(e))
 
     def SendWind(self,unitname,winddirdeg,winddir,windstr,windgust,tempc,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -583,9 +616,9 @@ class BasePlugin:
            sval += ts
 
            if tempc is not None:
-            sval += ";"+str(tempc)
+            sval += ";"+str(tempc)+";0"
            else:
-            sval += ";;"
+            sval += ";;;0"
            try:
             if battery is None:
              battery = 255
@@ -594,6 +627,7 @@ class BasePlugin:
             Domoticz.Debug(str(e))
 
     def SendMoisture(self,unitname,moist,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -618,6 +652,7 @@ class BasePlugin:
             Domoticz.Debug(str(e))
 
     def SendWattMeter(self,unitname,watt,battery,rssi):
+          global Devices
           iUnit = self.getdevID(unitname)
           if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
             try:
@@ -643,6 +678,16 @@ class BasePlugin:
             Devices[iUnit].Update(nValue=0,sValue=str(sval),BatteryLevel=int(battery),SignalLevel=int(rssi))
            except:
             Domoticz.Debug(str(e))
+
+    def getdirection(self,degree):
+     d = float(degree)
+     dirs = ['N', 'NNE', 'NE', 'ENE', 'E', 'ESE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'WSW', 'W', 'WNW', 'NW', 'NNW']
+     ix = round(d / (360. / len(dirs)))
+     try:
+      dir = dirs[ix % len(dirs)]
+     except:
+      dir = 'N'
+     return dir
 
     def gethumstatus(self,mval):
            hstat = 0
@@ -691,6 +736,10 @@ def onStop():
 def onConnect(Connection, Status, Description):
     global _plugin
     _plugin.onConnect(Connection, Status, Description)
+
+def onDeviceModified(Unit):
+    global _plugin
+    return
 
 def onDisconnect(Connection):
     global _plugin
