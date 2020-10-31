@@ -19,6 +19,12 @@
                 <option label="False" value="0"/>
             </options>
         </param>
+        <param field="Mode3" label="Disable ID usage in auto-naming" width="75px">
+            <options>
+                <option label="False" value="0"  default="true"/>
+                <option label="True" value="1"/>
+            </options>
+        </param>
 
         <param field="Mode6" label="Debug" width="75px">
             <options>
@@ -72,6 +78,12 @@ class BasePlugin:
             Domoticz.Debugging(2)
         self.base_topic = Parameters["Mode1"]
         self.learnmode  = Parameters["Mode2"]
+        try:
+         self.dontuseid = Parameters["Mode3"]
+        except:
+         self.dontuseid = 0
+        if self.dontuseid is None:
+         self.dontuseid = 0
         self.mqttserveraddress = Parameters["Address"].strip()
         self.mqttserverport = Parameters["Port"].strip()
         self.mqttClient = MqttClient(self.mqttserveraddress, self.mqttserverport, "", self.onMQTTConnected, self.onMQTTDisconnected, self.onMQTTPublish, self.onMQTTSubscribed)
@@ -188,7 +200,7 @@ class BasePlugin:
           if st=="":
            if 'unit' in message:
             st = str(message['unit'])
-          if ch=="" and st=="":
+          if self.dontuseid != 1:
            if 'id' in message:
             st = str(message['id']) # use id only for last resort, as cheap weather stations generates new id on every restart
          except:
@@ -265,7 +277,7 @@ class BasePlugin:
           tempc = float(tempc)
          except:
           tempc = None
-         if tempc<-40 or tempc>80:
+         if tempc is not None and (tempc<-40 or tempc>80):
           tempc = None
           return False # out of range - false positive
 
@@ -545,8 +557,14 @@ class BasePlugin:
             if len(prevdata)<2:
              prevdata.append(0)
              prevdata.append(0)
-            raintotal = prevdata[1]+rain
-           sval = str(int(float(rain)*100))+";"+str(raintotal)
+            try:
+             raintotal = float(prevdata[1])+(float(rain))
+            except:
+             pass
+           try:
+            sval = str(int(float(rain)*100))+";"+str(raintotal)
+           except:
+            sval = "0;0"
            try:
             if battery is None:
              battery = 255
@@ -704,6 +722,8 @@ class BasePlugin:
         if s:
          tn += s
         if c:
+         if s:
+          tn += "-"
          tn += c
         if d:
          tn += "-"+d[:16]

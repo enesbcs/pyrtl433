@@ -18,7 +18,7 @@ rtl_433 -F "mqtt://MQTTSERVERIP:1883,retain=0"
 1. Clone repository into your domoticz plugins folder
 ```
 cd domoticz/plugins
-git https://github.com/enesbcs/pyrtl433.git
+git clone https://github.com/enesbcs/pyrtl433.git
 ```
 2. Restart domoticz
 3. Go to "Hardware" page and add new item with type "PyRTL433"
