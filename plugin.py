@@ -1,5 +1,5 @@
 """
-<plugin key="PyRtl433" name="PyRtl433 RTL-SDR MQTT receiver" version="0.1.0">
+<plugin key="PyRtl433" name="PyRtl433 RTL-SDR MQTT receiver" version="0.2.0">
     <description>
       Simple plugin to interpret MQTT messages coming from RTL_433
       <br/>Please start the command below manually on the machine which has RTLSDR:<br/>
@@ -548,21 +548,8 @@ class BasePlugin:
              Domoticz.Debug(str(e))
              return False
           if iUnit>0:
-           if raintotal is None:
-            try:
-             curval = Devices[iUnit].sValue
-             prevdata = curval.split(";")
-            except:
-             prevdata = []
-            if len(prevdata)<2:
-             prevdata.append(0)
-             prevdata.append(0)
-            try:
-             raintotal = float(prevdata[1])+(float(rain))
-            except:
-             pass
            try:
-            sval = str(int(float(rain)*100))+";"+str(raintotal)
+            sval = str(float(rain)*100)+";"+str(float(rain))
            except:
             sval = "0;0"
            try:
