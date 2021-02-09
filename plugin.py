@@ -359,6 +359,10 @@ class BasePlugin:
              winddir = self.getdirection(winddirdeg)
 
           windgust = None
+        
+          if "wind_max_m_s" in message:
+            windgust = message['wind_max_m_s']
+                                
           if "wind_gust" in message:
             windgust = message['wind_gust']
           elif "gust" in message:
@@ -381,12 +385,32 @@ class BasePlugin:
          if (moisture is not None):
                self.SendMoisture(devname+"-moist",moisture,battery,signal)
 
+         lightlux = None
+        
+         if "light_lux" in message:
+            lightlux = message['light_lux']
+         
+         if lightlux is not None:
+            try:
+                self.SendLuxMeter(devname+"-lux", lightlux, battery, signal)
+            except Exception as e:
+              Domoticz.Debug(str(e))
+                    
          power = None
+        
          if "power_W" in message:
             power = message['power_W']
 
          if (power is not None):
                self.SendWattMeter(devname+"-power",watt,battery,signal)
+         
+         uv_index = None
+           
+         if "uvi" in message:
+           uv_index = message['uvi']
+          
+         if (uv_index is not None):
+            self.SendUVMeter(devname+"-uv", uv_index, tempc, battery, signal)
 
     def getdevID(self,unitname):
           global Devices
@@ -677,6 +701,68 @@ class BasePlugin:
             sval = str(float(watt)/1000)+";0"
            except:
             sval = "0;0"
+           try:
+            if battery is None:
+             battery = 255
+            Devices[iUnit].Update(nValue=0,sValue=str(sval),BatteryLevel=int(battery),SignalLevel=int(rssi))
+           except:
+            Domoticz.Debug(str(e))
+
+    def SendLuxMeter(self,unitname,lux,battery,rssi):
+          global Devices
+          iUnit = self.getdevID(unitname)
+          if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
+            try:
+             iUnit = 0
+             for x in range(1,256):
+              if x not in Devices:
+               iUnit=x
+               break
+             if iUnit==0:
+              iUnit=len(Devices)+1
+             Domoticz.Device(Name=unitname, Unit=iUnit,Type=246,Subtype=1,Used=0,DeviceID=unitname).Create() # lux
+            except Exception as e:
+             Domoticz.Debug(str(e))
+             return False
+          if iUnit>0:
+           try:
+            sval = str(lux)
+           except:
+            sval = "0"
+           try:
+            if battery is None:
+             battery = 255
+            Devices[iUnit].Update(nValue=0,sValue=str(sval),BatteryLevel=int(battery),SignalLevel=int(rssi))
+           except:
+            Domoticz.Debug(str(e))
+
+    def SendUVMeter(self,unitname,uv,tempc,battery,rssi):
+          global Devices
+          iUnit = self.getdevID(unitname)
+          if iUnit<0 and self.learnmode!=False: # if device does not exists in Domoticz, than create it
+            try:
+             iUnit = 0
+             for x in range(1,256):
+              if x not in Devices:
+               iUnit=x
+               break
+             if iUnit==0:
+              iUnit=len(Devices)+1
+             Domoticz.Device(Name=unitname, Unit=iUnit,Type=87,Subtype=3,Used=0,DeviceID=unitname).Create() # UV
+            except Exception as e:
+             Domoticz.Debug(str(e))
+             return False
+          if iUnit>0:
+           try:
+            sval = str(uv)
+
+            if tempc is not None:
+                sval += ";"+str(tempc)
+            else:
+                sval += ";0"
+           except:
+             sVal = "0"
+                
            try:
             if battery is None:
              battery = 255
