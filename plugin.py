@@ -362,8 +362,7 @@ class BasePlugin:
         
           if "wind_max_m_s" in message:
             windgust = message['wind_max_m_s']
-                                
-          if "wind_gust" in message:
+          elif "wind_gust" in message:
             windgust = message['wind_gust']
           elif "gust" in message:
             windgust = message['gust']
