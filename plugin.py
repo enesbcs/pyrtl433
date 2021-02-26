@@ -309,18 +309,20 @@ class BasePlugin:
                self.SendHumSensor(devname+"-hum",humi,battery,signal)
 
          rain = None
-         if "rain" in message:
-            rain = message['rain']
-         elif "rain_mm" in message:
-            rain = message['rain_mm']
-         elif "rainfall_mm" in message:
-            rain = message['rainfall_mm']
+         if "rain_rate_mm_h" in message:
+            rain = message['rain_rate_mm_h']
+         elif "rain_rate_in_h" in message:
+            rain = str(float(message['rain_rate_in_h']) * 25.4)
+            
          raintotal = None
-         if "rain_total" in message:
-            raintotal = message['rain_total']
+         if "rain_mm" in message:
+            raintotal = message['rain_mm']
+         elif "rain_in" in message:
+            raintotal = str(float(message['rain_in']) * 25.4)
+            
 
-         if rain is not None:
-               self.SendRainSensor(devname+"-rain",rain,raintotal,battery,signal)
+         if raintotal is not None:
+           self.SendRainSensor(devname+"-rain",rain,raintotal,battery,signal)
 
          depth = None
          if "depth_cm" in message:
@@ -572,9 +574,19 @@ class BasePlugin:
              return False
           if iUnit>0:
            try:
-            sval = str(float(rain)*100)+";"+str(float(rain))
+            if rain is not None:
+             sval = str(float(rain)*100)
+            else:
+             sval = "0"
+
+            if raintotal is not None:
+             sval += ";"+str(float(raintotal))
+            else:
+             sval += ";0"
+
            except:
             sval = "0;0"
+             
            try:
             if battery is None:
              battery = 255
